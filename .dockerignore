@@ -1,0 +1,34 @@
+# Keep the Docker build context small and secure
+
+.git/
+.gitignore
+.venv/
+venv/
+
+# Secrets — never bake into the image
+.env
+*.env
+!.env.example
+
+# Test / dev artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+*.log
+logs/
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Data files (mounted at runtime, not baked in)
+data/
+*.csv
+*.parquet

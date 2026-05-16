@@ -1,0 +1,32 @@
+version: "3.9"
+
+# ── Development Overrides ─────────────────────────────────────────────────────
+# Automatically applied on top of docker-compose.yml when running locally.
+# Enables: hot-reload, debug logging, source-mount, exposed DB ports.
+
+services:
+
+  app:
+    build:
+      target: development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --log-level debug
+    environment:
+      APP_ENV: development
+      LOG_LEVEL: debug
+    volumes:
+      - .:/app
+      - /app/.venv          # keep the venv layer from the image intact
+    ports:
+      - "8080:8080"
+
+  postgres:
+    ports:
+      - "5432:5432"         # expose locally for DB tools (TablePlus, DBeaver)
+
+  chromadb:
+    ports:
+      - "8001:8000"         # expose locally for ChromaDB UI / direct queries
+
+  redis:
+    ports:
+      - "6379:6379"         # expose locally for redis-cli inspection

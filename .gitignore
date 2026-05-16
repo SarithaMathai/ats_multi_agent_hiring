@@ -1,0 +1,76 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+
+# ── Poetry ────────────────────────────────────────────────────────────────────
+# poetry.lock is intentionally tracked — do not add it here
+
+# ── Environment / Secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+*.env
+!.env.example
+!configs/environments/.env.*
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Test / Coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+
+# ── Type checking ─────────────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# docker-compose.override.yml is tracked (dev convenience)
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.sqlite
+*.db
+
+# ── Data / ML ────────────────────────────────────────────────────────────────
+*.csv
+*.parquet
+data/
+models/cache/
+sentence_transformers/
+
+# ── Temporary ─────────────────────────────────────────────────────────────────
+*.tmp
+*.bak
+.cache/

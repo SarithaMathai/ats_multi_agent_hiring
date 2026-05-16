@@ -1,0 +1,114 @@
+version: "3.9"
+
+# ── ATS Multi-Agent Hiring System — Docker Compose ────────────────────────────
+# Services: app, postgres, chromadb, redis
+# Run:  docker compose up -d
+# Stop: docker compose down
+
+services:
+
+  # ── PostgreSQL — Structured Data Store ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ats_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ats_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ats_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ats_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ats_user} -d ${POSTGRES_DB:-ats_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ats_network
+    restart: unless-stopped
+
+  # ── ChromaDB — Vector / Unstructured Data Store ──────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ats_chromadb
+    environment:
+      CHROMA_SERVER_AUTHN_CREDENTIALS: ${CHROMA_TOKEN:-ats-chroma-token}
+      CHROMA_SERVER_AUTHN_PROVIDER: chromadb.auth.token_authn.TokenAuthenticationServerProvider
+      ANONYMIZED_TELEMETRY: "false"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    ports:
+      - "${CHROMA_PORT:-8001}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ats_network
+    restart: unless-stopped
+
+  # ── Redis — Cache & Event Bus ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ats_redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ats_network
+    restart: unless-stopped
+
+  # ── Application ──────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+      target: production
+    container_name: ats_app
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ats_network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ── Named Volumes ─────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  chromadb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  ats_network:
+    driver: bridge
+    name: ats_network
