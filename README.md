@@ -149,7 +149,7 @@ ats_multi_agent_hiring/
 git clone <repo-url>
 cd ats_multi_agent_hiring
 cp .env.example .env
-# Edit .env and set ANTHROPIC_API_KEY
+# Edit .env and set OPENAI_API_KEY
 ```
 
 ### 2. One-command setup (installs deps + starts services + migrates DB)
@@ -221,11 +221,11 @@ Copy `.env.example` → `.env`. Key variables:
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Required — your Anthropic API key |
+| `OPENAI_API_KEY` | Required — your OpenAI API key |
 | `DATABASE_URL` | PostgreSQL async connection string |
 | `CHROMA_TOKEN` | Bearer token for ChromaDB auth |
 | `REDIS_URL` | Redis connection string |
-| `ANTHROPIC_MODEL_*` | Model selection per agent tier |
+| `OPENAI_MODEL_*` | Model selection per agent tier (all `gpt-4o-mini`) |
 
 ---
 

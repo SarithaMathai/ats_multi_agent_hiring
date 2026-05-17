@@ -40,11 +40,11 @@ class ChromaSettings(BaseSettings):
 class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     # Model tiers match the architecture's cost-optimised routing
-    model_coordinator: str = Field(default="claude-opus-4-7", alias="ANTHROPIC_MODEL_COORDINATOR")
-    model_insight: str = Field(default="claude-sonnet-4-6", alias="ANTHROPIC_MODEL_INSIGHT")
-    model_support: str = Field(default="claude-haiku-4-5-20251001", alias="ANTHROPIC_MODEL_SUPPORT")
+    model_coordinator: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL_COORDINATOR")
+    model_insight: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL_INSIGHT")
+    model_support: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL_SUPPORT")
     embedding_model: str = Field(
         default="sentence-transformers/all-MiniLM-L6-v2",
         alias="EMBEDDING_MODEL",

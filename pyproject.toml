@@ -14,7 +14,7 @@ packages = [
     { include = "vector_store" },
     { include = "database" },
     { include = "shared" },
-    { include = "platform" },
+    { include = "mcp_platform" },
     { include = "configs" },
 ]
 
@@ -40,7 +40,7 @@ psycopg2-binary = "^2.9.10"
 chromadb = "^0.5.20"
 
 # LLM & Embeddings
-anthropic = "^0.40.0"
+openai = "^1.30.0"
 sentence-transformers = "^3.3.0"
 
 # Agent orchestration
