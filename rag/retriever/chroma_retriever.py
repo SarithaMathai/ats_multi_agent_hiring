@@ -6,19 +6,10 @@ to assemble the grounding context for their LLM prompts.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 from rag.embeddings.embedder import Embedder
-from vector_store.chroma.collection_manager import get_collection
+from rag.retriever.types import RetrievedChunk  # lightweight — no chromadb/torch on import
 
-
-@dataclass
-class RetrievedChunk:
-    id: str
-    document: str
-    metadata: dict = field(default_factory=dict)
-    distance: float = 0.0
-    collection_name: str = ""
+__all__ = ["ChromaRetriever", "RetrievedChunk"]
 
 
 class ChromaRetriever:
@@ -43,6 +34,7 @@ class ChromaRetriever:
         Returns:
             List of RetrievedChunk ordered by ascending distance (most similar first).
         """
+        from vector_store.chroma.collection_manager import get_collection  # lazy — avoids chromadb on import
         query_embedding = self._embedder.embed(query)
         collection = get_collection(collection_name)
 

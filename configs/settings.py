@@ -52,12 +52,32 @@ class LLMSettings(BaseSettings):
     embedding_dimension: int = Field(default=384, alias="EMBEDDING_DIMENSION")
 
 
+class LangfuseSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    public_key: str = Field(default="", alias="LANGFUSE_PUBLIC_KEY")
+    secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")
+    host: str = Field(default="https://cloud.langfuse.com", alias="LANGFUSE_HOST")
+    enabled: bool = Field(default=False, alias="LANGFUSE_ENABLED")
+
+
 class MCPSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     service_url: str = Field(default="http://localhost:9000", alias="MCP_SERVICE_URL")
     service_token: str = Field(default="", alias="MCP_SERVICE_TOKEN")
     timeout_seconds: int = Field(default=10, alias="MCP_TIMEOUT_SECONDS")
+
+
+class SmtpSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    host: str = Field(default="smtp.gmail.com", alias="SMTP_HOST")
+    port: int = Field(default=587, alias="SMTP_PORT")
+    user: str = Field(default="", alias="SMTP_USER")
+    password: str = Field(default="", alias="SMTP_PASSWORD")
+    from_address: str = Field(default="", alias="SMTP_FROM")
+    starttls: bool = Field(default=True, alias="SMTP_STARTTLS")
 
 
 class RedisSettings(BaseSettings):
@@ -85,6 +105,8 @@ class Settings(BaseSettings):
     llm: LLMSettings = LLMSettings()
     mcp: MCPSettings = MCPSettings()
     redis: RedisSettings = RedisSettings()
+    langfuse: LangfuseSettings = LangfuseSettings()
+    smtp: SmtpSettings = SmtpSettings()
 
     @property
     def is_development(self) -> bool:

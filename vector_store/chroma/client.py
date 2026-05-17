@@ -20,6 +20,7 @@ def get_chroma_client() -> chromadb.HttpClient:
             settings=Settings(
                 chroma_client_auth_provider="chromadb.auth.token_authn.TokenAuthClientProvider",
                 chroma_client_auth_credentials=settings.chroma.token,
+                anonymized_telemetry=False,   # suppress posthog version-mismatch warning
             ),
         )
     return _client

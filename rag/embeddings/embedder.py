@@ -4,25 +4,28 @@ Produces float vectors using the embedding model configured in settings.
 """
 from __future__ import annotations
 
-from sentence_transformers import SentenceTransformer
+from typing import TYPE_CHECKING
 
 from configs.settings import settings
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 
 class Embedder:
     """Thread-safe singleton — one model loaded per process."""
 
-    _instance: Embedder | None = None
-    _model: SentenceTransformer | None = None
+    _instance: "Embedder | None" = None
+    _model: "SentenceTransformer | None" = None
 
     def __new__(cls) -> Embedder:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def _get_model(self) -> SentenceTransformer:
+    def _get_model(self) -> "SentenceTransformer":
         if self._model is None:
-            # Strip the "sentence-transformers/" namespace prefix if present
+            from sentence_transformers import SentenceTransformer  # lazy — avoids PyTorch on import
             model_name = settings.llm.embedding_model.replace(
                 "sentence-transformers/", ""
             )

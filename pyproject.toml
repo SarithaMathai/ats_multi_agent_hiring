@@ -40,17 +40,21 @@ psycopg2-binary = "^2.9.10"
 chromadb = "^0.5.20"
 
 # LLM & Embeddings
-openai = "^1.30.0"
+openai = ">=1.30.0"
 sentence-transformers = "^3.3.0"
 
-# Agent orchestration
-langgraph = "^0.2.50"
+# LangChain ecosystem (LLM calls + orchestration + observability)
+langchain = "^0.3.0"
+langchain-openai = "^0.2.0"
+langchain-core = "^0.3.0"
+langgraph = ">=0.2.50"
+langfuse = "^2.0.0"
 
 # Caching & messaging
 redis = { extras = ["hiredis"], version = "^5.2.0" }
 
 # HTTP client
-httpx = "^0.27.0"
+httpx = ">=0.27.0"
 
 # Resilience
 tenacity = "^9.0.0"
@@ -65,13 +69,15 @@ python-json-logger = "^2.0.7"
 # Data processing
 pandas = "^2.2.0"
 numpy = "^1.26.0"
+streamlit = "^1.57.0"
+plotly = "^6.7.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
 pytest-asyncio = "^0.24.0"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
-httpx = "^0.27.0"
+httpx = ">=0.27.0"
 black = "^24.10.0"
 ruff = "^0.8.0"
 mypy = "^1.13.0"

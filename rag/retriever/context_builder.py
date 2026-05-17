@@ -5,7 +5,7 @@ Budget accounting: ~4 characters per token (rough but sufficient for prompt sizi
 """
 from __future__ import annotations
 
-from rag.retriever.chroma_retriever import RetrievedChunk
+from rag.retriever.types import RetrievedChunk
 
 _CHARS_PER_TOKEN = 4
 

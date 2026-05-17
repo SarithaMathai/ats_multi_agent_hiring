@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Thomas/IK-CapStone-Project/**)",
+      "Bash(mkdir \"c:\\\\Thomas\\\\IK-CapStone-Project\\\\ats_multi_agent_hiring\\\\ats-guide\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Thomas\\IK-CapStone-Project\\ats_multi_agent_hiring"
+    ]
+  }
+}
