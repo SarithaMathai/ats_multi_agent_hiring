@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ── ATS Multi-Agent Hiring System — Docker Compose ────────────────────────────
 # Services: app, postgres, chromadb, redis
 # Run:  docker compose up -d
@@ -32,7 +30,7 @@ services:
 
   # ── ChromaDB — Vector / Unstructured Data Store ──────────────────────────────
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.23
     container_name: ats_chromadb
     environment:
       CHROMA_SERVER_AUTHN_CREDENTIALS: ${CHROMA_TOKEN:-ats-chroma-token}
