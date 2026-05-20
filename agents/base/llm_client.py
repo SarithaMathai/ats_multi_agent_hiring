@@ -62,20 +62,6 @@ def _is_retryable(exc: BaseException) -> bool:
         return False
 
 
-def _make_langfuse_handler() -> Any | None:
-    """Create a Langfuse LangChain callback handler if observability is enabled."""
-    if not settings.langfuse.enabled:
-        return None
-    try:
-        from langfuse.callback import CallbackHandler
-        return CallbackHandler(
-            public_key=settings.langfuse.public_key,
-            secret_key=settings.langfuse.secret_key,
-            host=settings.langfuse.host,
-        )
-    except Exception:
-        return None
-
 
 class LLMClient:
     """LangChain ChatOpenAI wrapper — one instance per agent.
@@ -104,9 +90,6 @@ class LLMClient:
         # or the full LangChain import chain at startup / test time.
         self._base_llm: Any | None = None
 
-        # Langfuse callback — None when observability is disabled
-        self._langfuse_handler: Any | None = _make_langfuse_handler()
-
     def _get_llm(self) -> Any:
         """Lazy-create ChatOpenAI on first use — keeps __init__ import-free."""
         if self._base_llm is None:
@@ -131,6 +114,7 @@ class LLMClient:
         max_tokens: int = 1500,
         temperature: float = 0.2,
         json_mode: bool = True,
+        trace_id: str | None = None,
     ) -> LLMResponse:
         """Call the LLM via LangChain and return a structured response.
 
@@ -162,8 +146,9 @@ class LLMClient:
             bind_kwargs["response_format"] = {"type": "json_object"}
         llm: Any = self._get_llm().bind(**bind_kwargs)
 
-        callbacks = [self._langfuse_handler] if self._langfuse_handler else []
-        config: dict = {"callbacks": callbacks} if callbacks else {}
+        from agents.base import langfuse_helper
+        handler = langfuse_helper.make_callback_handler(trace_id)
+        config: dict = {"callbacks": [handler]} if handler else {}
 
         start = time.monotonic()
         ai_msg: Any = await self._invoke_with_retry(llm, lc_messages, config)

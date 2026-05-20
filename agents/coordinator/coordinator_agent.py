@@ -28,6 +28,7 @@ from typing import Any, ClassVar, TypedDict
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
 
+from agents.base import langfuse_helper
 from agents.base.base_agent import AgentContext, BaseAgent
 from agents.coordinator.response_assembler import CoordinatorResponse, assemble_response
 from agents.routing.agent_selector import SUPPORT_AGENTS, default_agents
@@ -45,7 +46,7 @@ _AGENT_REGISTRY: dict[str, type[BaseAgent]] = {}
 
 # ── LangGraph state schema ───────────────────────────────────────────────────────
 
-class PipelineState(TypedDict):
+class PipelineState(TypedDict, total=False):
     """Shared mutable state threaded through all LangGraph nodes."""
 
     query: str
@@ -59,6 +60,7 @@ class PipelineState(TypedDict):
     selected_agents: list[str]
     insight_outputs: list[AgentOutput]
     support_outputs: list[AgentOutput]
+    langfuse_trace: Any             # top-level Langfuse trace object (or None)
 
 
 # ── Pipeline request ─────────────────────────────────────────────────────────────
@@ -66,12 +68,15 @@ class PipelineState(TypedDict):
 class PipelineRequest(BaseModel):
     """Input to run_pipeline() — submitted by FastAPI / Streamlit."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     query: str
     structured_data: dict = {}
     rag_collections: list[str] = []
     filters: dict = {}
     run_id: str = ""
     forced_agents: list[str] = []  # scenario-set list bypasses routing LLM
+    langfuse_trace: Any = None     # top-level Langfuse trace for this run
 
 
 # ── Coordinator Agent ────────────────────────────────────────────────────────────
@@ -126,6 +131,7 @@ class CoordinatorAgent(BaseAgent):
             "selected_agents":  [],
             "insight_outputs":  [],
             "support_outputs":  [],
+            "langfuse_trace":   request.langfuse_trace,
         }
 
         final_state: PipelineState = await CoordinatorAgent._graph.ainvoke(initial_state)
@@ -154,33 +160,42 @@ class CoordinatorAgent(BaseAgent):
 
 async def _route_node(state: PipelineState) -> dict:
     """Node 1 — select agents via scenario forced list OR RoutingAgent LLM call."""
+    trace = state.get("langfuse_trace")
+    span = langfuse_helper.create_span(trace, "route", {"forced": bool(state.get("forced_agents"))})
+
     forced = state.get("forced_agents") or []
     if forced:
-        # Scenario pre-selected agents — skip LLM routing entirely
         logger.info("[%s] Forced agents (scenario): %s", state["run_id"], forced)
         routing_output = AgentOutput.skipped(agent_name="routing")
         routing_output.metadata["selected_agents"] = forced
         routing_output.metadata["routing_mode"] = "forced"
+        langfuse_helper.end_span(span, {"selected_agents": forced, "mode": "forced"})
         return {"routing_output": routing_output, "selected_agents": forced}
 
     context = _build_context(state)
     output = await RoutingAgent().run(context)
     selected = output.metadata.get("selected_agents") or default_agents()
     logger.info("[%s] Routing selected: %s", state["run_id"], selected)
+    langfuse_helper.end_span(span, {"selected_agents": selected, "mode": "llm"})
     return {"routing_output": output, "selected_agents": selected}
 
 
 async def _run_insights_node(state: PipelineState) -> dict:
     """Node 2 — run selected insight agents in parallel."""
+    trace = state.get("langfuse_trace")
     insight_names = [a for a in state["selected_agents"] if a not in SUPPORT_AGENTS]
+    span = langfuse_helper.create_span(trace, "run_insights_parallel", {"agents": insight_names})
     context = _build_context(state)
     outputs = await _run_parallel(insight_names, context)
+    langfuse_helper.end_span(span, {"agents_completed": len(outputs)})
     return {"insight_outputs": outputs}
 
 
 async def _run_support_node(state: PipelineState) -> dict:
     """Node 3 — run Evaluation + Optimization with insight outputs in context."""
+    trace = state.get("langfuse_trace")
     support_names = [a for a in state["selected_agents"] if a in SUPPORT_AGENTS]
+    span = langfuse_helper.create_span(trace, "run_support_sequential", {"agents": support_names})
     context = AgentContext(
         query=state["query"],
         run_id=state["run_id"],
@@ -188,8 +203,10 @@ async def _run_support_node(state: PipelineState) -> dict:
         rag_collections=state["rag_collections"],
         filters=state["filters"],
         previous_outputs=state.get("insight_outputs", []),
+        langfuse_trace=trace,
     )
     outputs = await _run_parallel(support_names, context)
+    langfuse_helper.end_span(span, {"agents_completed": len(outputs)})
     return {"support_outputs": outputs}
 
 
@@ -202,6 +219,7 @@ def _build_context(state: PipelineState) -> AgentContext:
         structured_data=state["structured_data"],
         rag_collections=state["rag_collections"],
         filters=state["filters"],
+        langfuse_trace=state.get("langfuse_trace"),
     )
 
 

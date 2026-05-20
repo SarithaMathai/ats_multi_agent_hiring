@@ -2,13 +2,17 @@
 Central application settings loaded from environment variables / .env file.
 All subsystems import from here — never read os.environ directly elsewhere.
 """
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Absolute path so settings load correctly regardless of working directory.
+_ENV_FILE = str(Path(__file__).parent.parent / ".env")
+
 
 class DatabaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     host: str = Field(default="localhost", alias="POSTGRES_HOST")
     port: int = Field(default=5432, alias="POSTGRES_PORT")
@@ -22,7 +26,7 @@ class DatabaseSettings(BaseSettings):
 
 
 class ChromaSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     host: str = Field(default="localhost", alias="CHROMA_HOST")
     port: int = Field(default=8001, alias="CHROMA_PORT")
@@ -38,7 +42,7 @@ class ChromaSettings(BaseSettings):
 
 
 class LLMSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     # Model tiers match the architecture's cost-optimised routing
@@ -53,7 +57,7 @@ class LLMSettings(BaseSettings):
 
 
 class LangfuseSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     public_key: str = Field(default="", alias="LANGFUSE_PUBLIC_KEY")
     secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")
@@ -62,7 +66,7 @@ class LangfuseSettings(BaseSettings):
 
 
 class MCPSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     service_url: str = Field(default="http://localhost:9000", alias="MCP_SERVICE_URL")
     service_token: str = Field(default="", alias="MCP_SERVICE_TOKEN")
@@ -70,7 +74,7 @@ class MCPSettings(BaseSettings):
 
 
 class SmtpSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     host: str = Field(default="smtp.gmail.com", alias="SMTP_HOST")
     port: int = Field(default=587, alias="SMTP_PORT")
@@ -81,7 +85,7 @@ class SmtpSettings(BaseSettings):
 
 
 class RedisSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     host: str = Field(default="localhost", alias="REDIS_HOST")
     port: int = Field(default=6379, alias="REDIS_PORT")
@@ -90,7 +94,7 @@ class RedisSettings(BaseSettings):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )

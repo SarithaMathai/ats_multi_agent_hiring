@@ -40,7 +40,7 @@ def initialise_all_collections() -> dict[str, chromadb.Collection]:
     collections = {}
     for name in _COLLECTION_NAMES:
         collections[name] = get_or_create_collection(name)
-        print(f"  ✓ collection ready: {name}")
+        print(f"  OK collection ready: {name}")
     return collections
 
 

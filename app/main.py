@@ -29,8 +29,9 @@ from app.api.middleware.logging_middleware import LoggingMiddleware
 from app.api.v1.router import v1_router
 from configs.settings import settings
 
-# ── Windows proxy fix — must happen before any HTTP client is created ─────────
+# ── Env fixes — must happen before any third-party client is created ─────────
 os.environ.setdefault("NO_PROXY", "*")
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")  # silence ChromaDB/PostHog warning
 
 logger = logging.getLogger("ats.main")
 
@@ -60,11 +61,16 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Starting ATS Multi-Agent Hiring System (env=%s)", settings.app_env)
 
-    # 2. ChromaDB collections — initialise_all_collections is synchronous
+    # 2. ChromaDB collections — capped at 10 s so a down server never blocks startup
     try:
         from vector_store.chroma.collection_manager import initialise_all_collections
-        await asyncio.to_thread(initialise_all_collections)
+        await asyncio.wait_for(
+            asyncio.to_thread(initialise_all_collections),
+            timeout=10.0,
+        )
         logger.info("ChromaDB collections initialised.")
+    except asyncio.TimeoutError:
+        logger.warning("ChromaDB init timed out after 10 s — RAG will degrade gracefully.")
     except Exception as exc:
         logger.warning("ChromaDB init skipped (will degrade gracefully): %s", exc)
 

@@ -1,0 +1,5 @@
+[server]
+baseUrlPath = ""
+
+[browser]
+gatherUsageStats = false

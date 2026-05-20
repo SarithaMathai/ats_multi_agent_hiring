@@ -10,6 +10,12 @@ them in the sidebar navigation.
 import sys
 import os
 
+# Disable ChromaDB anonymous telemetry before it is imported anywhere.
+# Without this, ChromaDB tries to call posthog.capture() with positional
+# args that don't match the installed PostHog version, printing a noisy
+# warning on every startup.
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
+
 # Make sure the project root (ats_multi_agent_hiring/) is on sys.path
 # so imports like `from configs.settings import settings` resolve correctly.
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

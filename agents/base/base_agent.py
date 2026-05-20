@@ -46,6 +46,7 @@ class AgentContext(BaseModel):
     rag_collections: list[str] = []          # override per-call; falls back to default_collections
     previous_outputs: list[AgentOutput] = [] # outputs from agents that already ran
     filters: dict[str, Any] = {}
+    langfuse_trace: Any = None               # top-level Langfuse trace for this pipeline run
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -133,21 +134,28 @@ class BaseAgent(ABC):
         Returns:
             A fully populated AgentOutput (status="success", evidence from RAG chunks).
         """
+        from agents.base import langfuse_helper  # lazy — avoids heavy import at module load
+
         cols = collections or context.rag_collections or self.default_collections
         k    = n_results if n_results is not None else self.n_rag_results
 
         chunks = []
         for col in cols:
+            rag_span = langfuse_helper.create_span(
+                context.langfuse_trace,
+                f"rag:{col}",
+                {"query": context.query, "collection": col, "n_results": k},
+            )
             try:
-                chunks.extend(
-                    self._get_retriever().retrieve(
-                        query=context.query,
-                        collection_name=col,
-                        n_results=k,
-                    )
+                new_chunks = self._get_retriever().retrieve(
+                    query=context.query,
+                    collection_name=col,
+                    n_results=k,
                 )
+                chunks.extend(new_chunks)
+                langfuse_helper.end_span(rag_span, {"chunks_retrieved": len(new_chunks)})
             except Exception:
-                pass  # RAG failure is non-fatal — agents degrade gracefully
+                langfuse_helper.end_span(rag_span, {"error": "retrieval failed"})
 
         rag_context = build_context_string(chunks, max_tokens=2000)
         system, user = build_prompt(
@@ -157,9 +165,11 @@ class BaseAgent(ABC):
             query=context.query,
         )
 
+        trace_id = langfuse_helper.get_trace_id(context.langfuse_trace)
         llm_resp = await self._llm.complete(
             system=system,
             messages=[{"role": "user", "content": user}],
+            trace_id=trace_id,
         )
 
         return parse_llm_output(

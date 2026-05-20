@@ -28,6 +28,7 @@ import logging
 import uuid
 from typing import Any
 
+from agents.base import langfuse_helper
 from agents.coordinator.coordinator_agent import CoordinatorAgent, PipelineRequest
 from agents.coordinator.response_assembler import CoordinatorResponse
 from orchestration.scenarios.balance_workload import BALANCE_WORKLOAD
@@ -91,17 +92,195 @@ class HiringAnalysisWorkflow(BaseWorkflow):
         )
         logger.info("[%s] Workflow.run — scenario=%s", run_id, request.scenario)
 
+        # Create a named top-level Langfuse trace for this pipeline run
+        trace = langfuse_helper.create_trace(
+            run_id=run_id,
+            query=query,
+            metadata={"scenario": request.scenario or "free_form", "filters": request.filters},
+        )
+
+        # Fetch live structured data from PostgreSQL so agents have real metrics
+        structured_data = await self._fetch_structured_data(request.filters)
+        logger.info(
+            "[%s] Structured data loaded — stages=%d candidates=%d rejections=%d "
+            "interviewers=%d offers=%d",
+            run_id,
+            len(structured_data.get("stages", [])),
+            len(structured_data.get("candidates", [])),
+            len(structured_data.get("rejections", [])),
+            len(structured_data.get("interviewers", [])),
+            len(structured_data.get("offers", [])),
+        )
+
         pipeline_req = PipelineRequest(
             query=query,
-            structured_data={},
+            structured_data=structured_data,
             rag_collections=[],
             filters=request.filters,
             run_id=run_id,
             forced_agents=forced_agents,
+            langfuse_trace=trace,
         )
         response = await self._coordinator.run_pipeline(pipeline_req)
         _update_run_state(run_state, response)
+
+        langfuse_helper.update_trace(trace, {
+            "status": response.status,
+            "agents_run": [o.agent_name for o in response.agent_outputs if o.status != "skipped"],
+            "total_tokens": response.total_tokens,
+            "total_latency_ms": response.total_latency_ms,
+        })
+        langfuse_helper.flush()
+
+        try:
+            from orchestration.state import run_history_store
+            run_history_store.append_run(response, scenario=request.scenario)
+        except Exception as exc:
+            logger.warning("[%s] Could not save run to history store: %s", run_id, exc)
+
         return response
+
+    async def _fetch_structured_data(self, filters: dict) -> dict[str, Any]:
+        """Fetch all hiring data from PostgreSQL and shape it for agent consumption.
+
+        Agents compute structured metrics from this data — empty structured_data
+        causes every metric calculator to return data_quality='missing', leading
+        to LLM hallucination and low confidence scores.
+        """
+        try:
+            from database.sessions.async_session import AsyncSessionLocal
+            from sqlalchemy import text
+
+            position_list = filters.get("position") or []
+            channel_list  = filters.get("source_channel") or []
+
+            # Candidate filter conditions shared across JOIN queries
+            cond_parts = ["1=1"]
+            params: dict[str, Any] = {}
+            if position_list:
+                cond_parts.append("c.position = ANY(:positions)")
+                params["positions"] = position_list
+            if channel_list:
+                cond_parts.append("c.source_channel = ANY(:channels)")
+                params["channels"] = channel_list
+            cand_where = " AND ".join(cond_parts)
+
+            async with AsyncSessionLocal() as session:
+
+                # 1. Stage funnel — PipelineHealthAgent needs entered/exited/avg_days
+                r = await session.execute(text(f"""
+                    SELECT s.stage_name,
+                           COUNT(*)                                              AS candidates_entered,
+                           COUNT(CASE WHEN s.outcome IN ('passed','accepted') THEN 1 END)
+                                                                                AS candidates_exited,
+                           COALESCE(AVG(s.duration_hours) / 24.0, 0)           AS avg_days_in_stage
+                    FROM ats.interview_stages s
+                    JOIN ats.candidates c ON c.id = s.candidate_id
+                    WHERE {cand_where}
+                    GROUP BY s.stage_name
+                    ORDER BY CASE s.stage_name
+                        WHEN 'application_review'  THEN 1
+                        WHEN 'phone_screen'         THEN 2
+                        WHEN 'technical_assessment' THEN 3
+                        WHEN 'panel_interview'      THEN 4
+                        WHEN 'final_interview'      THEN 5
+                        WHEN 'offer'                THEN 6
+                        ELSE 7 END
+                """), params)
+                stages = [dict(row._mapping) for row in r]
+
+                # 2. Candidates — SourcingQualityAgent + stuck-candidate detection
+                #    quality_score: normalize experience_years to 0-1 by position's typical ceiling
+                r = await session.execute(text(f"""
+                    SELECT c.id::text                                           AS candidate_id,
+                           c.source_channel,
+                           CASE c.overall_status
+                               WHEN 'withdrew' THEN 'withdrawn'
+                               ELSE c.overall_status
+                           END                                                  AS status,
+                           c.current_stage                                      AS stage,
+                           c.experience_years,
+                           ROUND(LEAST(
+                               c.experience_years / CASE c.position
+                                   WHEN 'Software Engineer'        THEN 5.0
+                                   WHEN 'Senior Software Engineer' THEN 12.0
+                                   WHEN 'Data Scientist'           THEN 8.0
+                                   WHEN 'Product Manager'          THEN 10.0
+                                   WHEN 'DevOps Engineer'          THEN 8.0
+                                   ELSE 8.0 END,
+                               1.0
+                           )::numeric, 2)                                       AS quality_score,
+                           COALESCE(
+                               EXTRACT(EPOCH FROM (NOW() - MAX(s.entered_at))) / 86400.0,
+                               0
+                           )                                                    AS days_in_current_stage
+                    FROM ats.candidates c
+                    LEFT JOIN ats.interview_stages s
+                        ON s.candidate_id = c.id AND s.stage_name = c.current_stage
+                    WHERE {cand_where}
+                    GROUP BY c.id, c.source_channel, c.overall_status,
+                             c.current_stage, c.experience_years, c.position
+                """), params)
+                candidates = [dict(row._mapping) for row in r]
+
+                # 3. Rejections — ImprovementActionAgent
+                r = await session.execute(text(f"""
+                    SELECT r.stage_name         AS stage,
+                           r.reason_category    AS rejection_category,
+                           r.reason_detail      AS reason
+                    FROM ats.rejections r
+                    JOIN ats.candidates c ON c.id = r.candidate_id
+                    WHERE {cand_where}
+                """), params)
+                rejections = [dict(row._mapping) for row in r]
+
+                # 4. Interviewers with workload — ResourceOptimizationAgent
+                #    avg_rating: fraction of completed interviews with outcome='passed'
+                r = await session.execute(text("""
+                    SELECT i.id::text                                            AS interviewer_id,
+                           i.name,
+                           i.department,
+                           i.role,
+                           COUNT(s.id)                                           AS interviews_assigned,
+                           ROUND(COALESCE(
+                               AVG(CASE WHEN s.outcome = 'passed' THEN 1.0 ELSE 0.0 END),
+                               0.0
+                           )::numeric, 2)                                        AS avg_rating
+                    FROM ats.interviewers i
+                    LEFT JOIN ats.interview_stages s ON s.interviewer_id = i.id
+                    WHERE i.is_active = true
+                    GROUP BY i.id, i.name, i.department, i.role
+                    ORDER BY COUNT(s.id) DESC
+                """))
+                interviewers = [dict(row._mapping) for row in r]
+
+                # 5. Offers — OfferInsightsAgent
+                r = await session.execute(text(f"""
+                    SELECT o.position,
+                           o.status,
+                           o.rejection_reason                                    AS decline_reason,
+                           o.salary_offered,
+                           ROUND(COALESCE(
+                               EXTRACT(EPOCH FROM (o.responded_at - o.offered_at)) / 86400.0,
+                               NULL
+                           )::numeric, 1)                                        AS days_to_respond
+                    FROM ats.offers o
+                    JOIN ats.candidates c ON c.id = o.candidate_id
+                    WHERE {cand_where}
+                """), params)
+                offers = [dict(row._mapping) for row in r]
+
+            return {
+                "stages":       stages,
+                "candidates":   candidates,
+                "rejections":   rejections,
+                "interviewers": interviewers,
+                "offers":       offers,
+            }
+
+        except Exception as exc:
+            logger.warning("Could not fetch structured data from PostgreSQL: %s", exc)
+            return {}
 
     async def run_scenario(
         self,

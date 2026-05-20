@@ -96,20 +96,20 @@ def pick_interviewer(position: str, alice_boost: bool = False) -> str:
 # ── 2. CANDIDATES ──────────────────────────────────────────────────────────────
 
 POSITION_DIST = (
-    ["Software Engineer"] * 20 +
-    ["Senior Software Engineer"] * 15 +
-    ["Data Scientist"] * 10 +
-    ["Product Manager"] * 8 +
-    ["DevOps Engineer"] * 7
+    ["Software Engineer"] * 40 +
+    ["Senior Software Engineer"] * 30 +
+    ["Data Scientist"] * 20 +
+    ["Product Manager"] * 16 +
+    ["DevOps Engineer"] * 14
 )
 
 CHANNEL_DIST = (
-    ["LinkedIn"] * 22 +
-    ["Referral"] * 12 +
-    ["Indeed"] * 10 +
-    ["Company Website"] * 8 +
-    ["GitHub"] * 5 +
-    ["University"] * 3
+    ["LinkedIn"] * 44 +
+    ["Referral"] * 24 +
+    ["Indeed"] * 20 +
+    ["Company Website"] * 16 +
+    ["GitHub"] * 12 +
+    ["University"] * 4
 )
 
 SKILLS_BY_POSITION = {
@@ -188,7 +188,7 @@ random.shuffle(POSITION_DIST)
 random.shuffle(CHANNEL_DIST)
 
 CANDIDATES = []
-for i in range(60):
+for i in range(120):
     position = POSITION_DIST[i]
     channel  = CHANNEL_DIST[i]
     exp_min, exp_max = EXPERIENCE_BY_POSITION[position]
@@ -214,11 +214,11 @@ for i in range(60):
 # Pass rates per stage per channel
 CHANNEL_TECH_PASS = {
     "LinkedIn":        0.50,
-    "Referral":        0.75,
-    "Indeed":          0.30,   # deliberate weak channel
-    "Company Website": 0.65,
-    "GitHub":          0.80,   # deliberate strong channel
-    "University":      0.40,
+    "Referral":        0.82,   # deliberate strong channel (was 0.75)
+    "Indeed":          0.18,   # deliberate weak channel  (was 0.30)
+    "Company Website": 0.62,
+    "GitHub":          0.88,   # deliberate strongest     (was 0.80)
+    "University":      0.35,   # weak — graduates under-skilled (was 0.40)
 }
 
 STAGE_ORDER = [
@@ -348,18 +348,18 @@ STAGES = []
 OFFERS = []
 REJECTIONS_LIST = []
 
-# Track rejection reason targets
+# Track rejection reason targets (scaled to 120 candidates)
 rejection_targets = {
-    "technical_skills": 12,
-    "experience_level": 7,
-    "culture_fit":      4,
-    "compensation":     3,
-    "withdrew":         2,
+    "technical_skills": 24,
+    "experience_level": 14,
+    "culture_fit":       8,
+    "compensation":      6,
+    "withdrew":          4,
 }
 rejection_counts = {k: 0 for k in rejection_targets}
 
-# Track offer decline targets
-offer_decline_targets = {"compensation": 2, "accepted_elsewhere": 1, "role_mismatch": 1}
+# Track offer decline targets (scaled to 120 candidates)
+offer_decline_targets = {"compensation": 4, "accepted_elsewhere": 2, "role_mismatch": 2}
 offer_decline_counts = {k: 0 for k in offer_decline_targets}
 
 # Alice interview count tracker (for overloading)

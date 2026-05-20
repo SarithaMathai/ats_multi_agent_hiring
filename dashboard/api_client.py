@@ -89,6 +89,55 @@ class ATSApiClient:
             logger.warning("get_run(%s) failed: %s", run_id, exc)
             return _OFFLINE_RESPONSE
 
+    # ── Metrics / Reports ─────────────────────────────────────────────────────
+
+    def get_live_metrics(self) -> dict[str, Any]:
+        """GET /api/v1/metrics/live — pre-aggregated PostgreSQL data for charts."""
+        try:
+            resp = self._client.get("/api/v1/metrics/live")
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("get_live_metrics failed: %s", exc)
+            return {}
+
+    def get_run_history(
+        self,
+        limit: int = 50,
+        scenario: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """GET /api/v1/metrics/runs — run history from JSONL store."""
+        params: dict[str, Any] = {"limit": limit}
+        if scenario:
+            params["scenario"] = scenario
+        try:
+            resp = self._client.get("/api/v1/metrics/runs", params=params)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("get_run_history failed: %s", exc)
+            return []
+
+    def get_run_detail(self, run_id: str) -> dict[str, Any]:
+        """GET /api/v1/metrics/runs/{run_id} — single run from JSONL store."""
+        try:
+            resp = self._client.get(f"/api/v1/metrics/runs/{run_id}")
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("get_run_detail(%s) failed: %s", run_id, exc)
+            return {}
+
+    def get_scenarios_summary(self) -> list[dict[str, Any]]:
+        """GET /api/v1/metrics/scenarios/summary — run counts per scenario."""
+        try:
+            resp = self._client.get("/api/v1/metrics/scenarios/summary")
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("get_scenarios_summary failed: %s", exc)
+            return []
+
     # ── Health ────────────────────────────────────────────────────────────────
 
     def health_check(self) -> dict[str, Any]:
